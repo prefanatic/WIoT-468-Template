@@ -8,6 +8,7 @@ import android.widget.TextView;
 
 import butterknife.Bind;
 import butterknife.OnClick;
+import edu.uri.egr.hermes.manipulators.FileLog;
 import edu.uri.egr.hermesble.HermesBLE;
 import edu.uri.egr.hermesble.attributes.RBLGattAttributes;
 import edu.uri.egr.hermesble.ui.BLESelectionDialog;
@@ -30,6 +31,7 @@ public class MainActivity extends HermesActivity {
     // Access the views from our layout.
     @Bind(R.id.control_button) Switch mControlButton;
     @Bind(R.id.analog_value) TextView mTextValue;
+    @Bind(R.id.heart_value) TextView mHeartRate;
 
     // Hook into our control button, and allow us to run code when one clicks on it.
     @OnClick(R.id.control_button)
@@ -54,6 +56,13 @@ public class MainActivity extends HermesActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // Create the log file.
+        FileLog heartRateLog = new FileLog("wiot-heart-rate.csv");
+        heartRateLog.setHeaders("Date", "Time", "Heart Rate");
+
+        FileLog analogLog = new FileLog("wiot-analog.csv");
+        analogLog.setHeaders("Date", "Time", "Analog Value");
 
         BLESelectionDialog dialog = new BLESelectionDialog();
         // Now, we need to subscribe to it.  This might look like black magic, but just follow the comments.
@@ -88,9 +97,20 @@ public class MainActivity extends HermesActivity {
                         // .subscribe tells the Observable to finally startup, and that after we've marched
                         // through the above, we'll get an event.
                 .subscribe(uartEvent -> {
-                    Timber.d("Received event: %02x - with data: %s", uartEvent.type, String.valueOf(uartEvent.data));
-                    if (uartEvent.type == 0x0B)
-                        mTextValue.setText(String.valueOf(uartEvent.data));
+                    String value = String.valueOf(uartEvent.data);
+
+                    switch (uartEvent.type) {
+                        case 0x0B:
+                            mTextValue.setText(value);
+                            analogLog.write(analogLog.date(), analogLog.time(), value);
+
+                            break;
+                        case 0x0A:
+                            mHeartRate.setText(value);
+                            heartRateLog.write(heartRateLog.date(), heartRateLog.time(), value);
+
+                            break;
+                    }
                 });
 
         // We also need to make sure our dialog can be seen.  If this isn't run, then nothing shows up!.
